@@ -29,8 +29,24 @@ class HostsFileBlocker:
         self.hosts_path.write_text("\n".join(lines) + "\n")
 
     def _split_managed(self, lines: list[str]) -> tuple[list[str], list[str]]:
-        if self.MANAGED_START not in lines or self.MANAGED_END not in lines:
-            return lines, []
-        start_idx = lines.index(self.MANAGED_START)
-        end_idx = lines.index(self.MANAGED_END)
-        return lines[:start_idx], lines[end_idx + 1 :]
+        has_start = self.MANAGED_START in lines
+        has_end = self.MANAGED_END in lines
+
+        # Both markers present: normal case
+        if has_start and has_end:
+            start_idx = lines.index(self.MANAGED_START)
+            end_idx = lines.index(self.MANAGED_END)
+            return lines[:start_idx], lines[end_idx + 1 :]
+
+        # Only START present: strip from START to end of file
+        if has_start and not has_end:
+            start_idx = lines.index(self.MANAGED_START)
+            return lines[:start_idx], []
+
+        # Only END present: strip only the orphaned END marker, preserve all other content as "before"
+        if has_end and not has_start:
+            end_idx = lines.index(self.MANAGED_END)
+            return lines[:end_idx], []
+
+        # Neither marker present: no managed block to remove
+        return lines, []
