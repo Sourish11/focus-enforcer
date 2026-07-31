@@ -38,15 +38,15 @@ class HostsFileBlocker:
             end_idx = lines.index(self.MANAGED_END)
             return lines[:start_idx], lines[end_idx + 1 :]
 
-        # Only START present: strip from START to end of file
+        # Only START present: strip only the START marker itself, preserve content before and after
         if has_start and not has_end:
             start_idx = lines.index(self.MANAGED_START)
-            return lines[:start_idx], []
+            return lines[:start_idx], lines[start_idx + 1 :]
 
-        # Only END present: strip only the orphaned END marker, preserve all other content as "before"
+        # Only END present: strip only the orphaned END marker itself, preserve content before and after
         if has_end and not has_start:
             end_idx = lines.index(self.MANAGED_END)
-            return lines[:end_idx], []
+            return lines[:end_idx], lines[end_idx + 1 :]
 
         # Neither marker present: no managed block to remove
         return lines, []

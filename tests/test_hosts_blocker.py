@@ -57,9 +57,10 @@ def test_empty_hostname_list_clears_managed_entries(tmp_path):
 
 
 def test_handles_orphaned_managed_start_marker(tmp_path):
-    """File with only MANAGED_START (no matching END) should not duplicate markers."""
+    """File with only MANAGED_START (no matching END) should not duplicate markers or drop content."""
     hosts_path = tmp_path / "hosts"
     # Simulate corrupted state: MANAGED_START present but MANAGED_END missing
+    # All non-marker lines should be preserved as legitimate content
     hosts_path.write_text("127.0.0.1 localhost\n# FOCUS-ENFORCER-START\n127.0.0.1 old.reddit.com\n")
     blocker = HostsFileBlocker(hosts_path)
 
@@ -69,10 +70,9 @@ def test_handles_orphaned_managed_start_marker(tmp_path):
     # Should have exactly one START marker, not two
     assert content.count("# FOCUS-ENFORCER-START") == 1
     assert content.count("# FOCUS-ENFORCER-END") == 1
-    # Old unrelated line should be preserved
+    # All unrelated lines should be preserved (data loss prevention)
     assert "127.0.0.1 localhost" in content
-    # Old blocked entry should be gone
-    assert "127.0.0.1 old.reddit.com" not in content
+    assert "127.0.0.1 old.reddit.com" in content
     # New entry should be present
     assert "127.0.0.1 youtube.com" in content
 
@@ -95,3 +95,42 @@ def test_handles_orphaned_managed_end_marker(tmp_path):
     assert "127.0.0.1 localhost" in content
     # New entry should be present
     assert "127.0.0.1 twitter.com" in content
+
+
+def test_preserves_content_after_orphaned_end_marker(tmp_path):
+    """Orphaned END marker should not cause data loss of lines following it."""
+    hosts_path = tmp_path / "hosts"
+    # Orphaned END marker as first line, with legitimate content after it
+    hosts_path.write_text("# FOCUS-ENFORCER-END\n127.0.0.1 mybank.com\n")
+    blocker = HostsFileBlocker(hosts_path)
+
+    blocker.set_blocked_hostnames(["reddit.com"])
+
+    content = hosts_path.read_text()
+    # Should have exactly one pair of markers
+    assert content.count("# FOCUS-ENFORCER-START") == 1
+    assert content.count("# FOCUS-ENFORCER-END") == 1
+    # Legitimate content after orphaned marker must be preserved (data loss prevention)
+    assert "127.0.0.1 mybank.com" in content
+    # New entry should be present
+    assert "127.0.0.1 reddit.com" in content
+
+
+def test_preserves_content_after_orphaned_start_marker(tmp_path):
+    """Orphaned START marker should not cause data loss of lines following it."""
+    hosts_path = tmp_path / "hosts"
+    # Orphaned START marker with legitimate content after it
+    hosts_path.write_text("# FOCUS-ENFORCER-START\n127.0.0.1 mybank.com\n127.0.0.1 localhost\n")
+    blocker = HostsFileBlocker(hosts_path)
+
+    blocker.set_blocked_hostnames(["reddit.com"])
+
+    content = hosts_path.read_text()
+    # Should have exactly one pair of markers
+    assert content.count("# FOCUS-ENFORCER-START") == 1
+    assert content.count("# FOCUS-ENFORCER-END") == 1
+    # Legitimate content after orphaned marker must be preserved (data loss prevention)
+    assert "127.0.0.1 mybank.com" in content
+    assert "127.0.0.1 localhost" in content
+    # New entry should be present
+    assert "127.0.0.1 reddit.com" in content
