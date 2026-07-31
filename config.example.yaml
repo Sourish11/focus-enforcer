@@ -1,0 +1,11 @@
+sites:
+  - name: reddit
+    hostnames: [reddit.com, www.reddit.com, old.reddit.com]
+    daily_budget_minutes: 20
+  - name: youtube
+    hostnames: [youtube.com, www.youtube.com]
+    daily_budget_minutes: 30
+    scheduled_block:
+      start: "09:00"
+      end: "17:00"
+enforcement_interval_seconds: 30
