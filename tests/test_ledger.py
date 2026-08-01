@@ -49,3 +49,15 @@ def test_spend_and_unlock_accumulates_across_calls_same_day(tmp_path):
     ledger.spend_and_unlock("reddit", 5, now)
     ledger.spend_and_unlock("reddit", 5, now)
     assert ledger.minutes_used_today("reddit", now) == 10.0
+
+
+def test_spend_and_unlock_creates_missing_state_directory(tmp_path):
+    state_path = tmp_path / "nested" / "does" / "not" / "exist" / "state.json"
+    assert not state_path.parent.exists()
+
+    ledger = UsageLedger(state_path)
+    now = datetime(2026, 7, 31, 9, 0)
+    ledger.spend_and_unlock("reddit", 10, now)
+
+    assert state_path.exists()
+    assert ledger.minutes_used_today("reddit", now) == 10.0

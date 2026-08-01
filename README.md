@@ -44,3 +44,8 @@ sudo enforcer daemon   # run in the foreground, or wrap in a systemd user servic
 ```bash
 pytest -v
 ```
+
+## Design
+
+See `docs/design.md` for the
+full design writeup, including the OOP class breakdown and rationale.

@@ -16,6 +16,7 @@ class UsageLedger:
         return json.loads(self.state_path.read_text())
 
     def _save(self) -> None:
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(json.dumps(self._state))
 
     @staticmethod
