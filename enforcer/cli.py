@@ -33,13 +33,29 @@ def _cmd_status(enforcer: FocusEnforcer, now: datetime) -> int:
 
 
 def _cmd_unlock(enforcer: FocusEnforcer, site_name: str, minutes: float, now: datetime) -> int:
+    # Determine, before spending anything, whether this request would fail
+    # purely for lack of budget — so the failure message below is accurate
+    # even though `unlock()` itself may already have spent the budget (in
+    # the "still blocked by another rule" case).
+    site = next((s for s in enforcer.sites if s.name == site_name), None)
+    insufficient_budget = True
+    if site is not None:
+        used = enforcer.ledger.minutes_used_today(site.name, now)
+        remaining = site.daily_budget_minutes - used
+        insufficient_budget = minutes <= 0 or minutes > remaining
+
     try:
         granted = enforcer.unlock(site_name, minutes, now)
     except ValueError:
         print(f"Unknown site: {site_name}")
         return 1
     if not granted:
-        print(f"No budget remaining today for {site_name}")
+        if insufficient_budget:
+            print(f"No budget remaining today for {site_name}")
+        else:
+            # Budget was spent, but the site is still blocked by another rule
+            # (e.g. a ScheduleRule covering a fixed work-hours window).
+            print(f"{site_name} is still blocked by a scheduled block window, even though budget was spent")
         return 1
     print(f"Unlocked {site_name} for {minutes} minutes")
     return 0
@@ -81,6 +97,9 @@ def main(
         return 1
     except yaml.YAMLError:
         print(f"Config file is not valid YAML: {resolved_config_path}")
+        return 1
+    except (KeyError, TypeError):
+        print(f"Config file is missing required fields: {resolved_config_path}")
         return 1
 
     now = datetime.now()

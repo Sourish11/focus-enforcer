@@ -26,6 +26,9 @@ class FocusEnforcer:
         if site is None:
             raise ValueError(f"Unknown site: {site_name}")
 
+        if minutes <= 0:
+            return False
+
         used = self.ledger.minutes_used_today(site.name, now)
         remaining = site.daily_budget_minutes - used
         if minutes > remaining:
@@ -33,7 +36,7 @@ class FocusEnforcer:
 
         self.ledger.spend_and_unlock(site.name, minutes, now)
         self.sync(now)
-        return True
+        return site.is_blocked(now, self.ledger) is False
 
     def daemon(self, interval_seconds: int) -> None:
         while True:

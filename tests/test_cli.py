@@ -136,6 +136,50 @@ def test_invalid_config_yaml_reports_error(tmp_path, capsys):
     assert "config" in out.lower()
 
 
+def test_config_missing_sites_key_reports_error(tmp_path, capsys):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("enforcement_interval_seconds: 30\n")
+    state_path = tmp_path / "state.json"
+    hosts_path = tmp_path / "hosts"
+    hosts_path.write_text("")
+
+    exit_code = main(
+        ["status"],
+        state_path=state_path,
+        hosts_path=hosts_path,
+        config_path=config_path,
+    )
+
+    assert exit_code == 1
+    out = capsys.readouterr().out
+    assert "config" in out.lower()
+
+
+def test_config_site_missing_daily_budget_minutes_reports_error(tmp_path, capsys):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+sites:
+  - name: reddit
+    hostnames: [reddit.com]
+"""
+    )
+    state_path = tmp_path / "state.json"
+    hosts_path = tmp_path / "hosts"
+    hosts_path.write_text("")
+
+    exit_code = main(
+        ["status"],
+        state_path=state_path,
+        hosts_path=hosts_path,
+        config_path=config_path,
+    )
+
+    assert exit_code == 1
+    out = capsys.readouterr().out
+    assert "config" in out.lower()
+
+
 def test_unwritable_hosts_file_reports_error(tmp_path, capsys):
     config_path = _write_config(tmp_path)
     state_path = tmp_path / "state.json"
