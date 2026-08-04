@@ -31,6 +31,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+config.yaml
+state.json
 
 # local course notes / drafts
 docs/

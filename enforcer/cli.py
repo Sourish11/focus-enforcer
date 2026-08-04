@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from enforcer.config import load_config
+from enforcer.config import Config, load_config
 from enforcer.enforcer import FocusEnforcer
 from enforcer.hosts_blocker import HostsFileBlocker
 from enforcer.ledger import UsageLedger
@@ -16,11 +16,11 @@ DEFAULT_STATE_PATH = Path.home() / ".local" / "state" / "focus-enforcer" / "stat
 DEFAULT_HOSTS_PATH = Path("/etc/hosts")
 
 
-def _build_enforcer(state_path: Path, hosts_path: Path, config_path: Path) -> FocusEnforcer:
+def _build_enforcer(state_path: Path, hosts_path: Path, config_path: Path) -> tuple[FocusEnforcer, Config]:
     config = load_config(config_path)
     ledger = UsageLedger(state_path)
     blocker = HostsFileBlocker(hosts_path)
-    return FocusEnforcer(sites=config.sites, ledger=ledger, blocker=blocker)
+    return FocusEnforcer(sites=config.sites, ledger=ledger, blocker=blocker), config
 
 
 def _cmd_status(enforcer: FocusEnforcer, now: datetime) -> int:
@@ -33,24 +33,13 @@ def _cmd_status(enforcer: FocusEnforcer, now: datetime) -> int:
 
 
 def _cmd_unlock(enforcer: FocusEnforcer, site_name: str, minutes: float, now: datetime) -> int:
-    # Determine, before spending anything, whether this request would fail
-    # purely for lack of budget — so the failure message below is accurate
-    # even though `unlock()` itself may already have spent the budget (in
-    # the "still blocked by another rule" case).
-    site = next((s for s in enforcer.sites if s.name == site_name), None)
-    insufficient_budget = True
-    if site is not None:
-        used = enforcer.ledger.minutes_used_today(site.name, now)
-        remaining = site.daily_budget_minutes - used
-        insufficient_budget = minutes <= 0 or minutes > remaining
-
     try:
-        granted = enforcer.unlock(site_name, minutes, now)
+        result = enforcer.unlock(site_name, minutes, now)
     except ValueError:
         print(f"Unknown site: {site_name}")
         return 1
-    if not granted:
-        if insufficient_budget:
+    if not result.granted:
+        if result.reason == "insufficient_budget":
             print(f"No budget remaining today for {site_name}")
         else:
             # Budget was spent, but the site is still blocked by another rule
@@ -58,11 +47,6 @@ def _cmd_unlock(enforcer: FocusEnforcer, site_name: str, minutes: float, now: da
             print(f"{site_name} is still blocked by a scheduled block window, even though budget was spent")
         return 1
     print(f"Unlocked {site_name} for {minutes} minutes")
-    return 0
-
-
-def _cmd_daemon(enforcer: FocusEnforcer, interval_seconds: int) -> int:
-    enforcer.daemon(interval_seconds)
     return 0
 
 
@@ -91,7 +75,7 @@ def main(
     resolved_hosts_path = hosts_path or DEFAULT_HOSTS_PATH
 
     try:
-        enforcer = _build_enforcer(resolved_state_path, resolved_hosts_path, resolved_config_path)
+        enforcer, config = _build_enforcer(resolved_state_path, resolved_hosts_path, resolved_config_path)
     except FileNotFoundError:
         print(f"Config file not found: {resolved_config_path}")
         return 1
@@ -110,12 +94,9 @@ def main(
         if args.command == "unlock":
             return _cmd_unlock(enforcer, args.site, args.minutes, now)
         if args.command == "daemon":
-            config = load_config(resolved_config_path)
             interval = args.interval_seconds or config.enforcement_interval_seconds
-            return _cmd_daemon(enforcer, interval)
+            enforcer.daemon(interval)
+            return 0
     except PermissionError:
         print(f"Permission denied writing to {resolved_hosts_path} — re-run with sudo.")
         return 1
-
-    parser.error(f"Unknown command: {args.command}")
-    return 2

@@ -17,11 +17,16 @@ enforcement_interval_seconds: 30
     return config_path
 
 
-def test_status_reports_blocked_site_by_default(tmp_path, capsys):
-    config_path = _write_config(tmp_path)
+def _state_and_hosts_paths(tmp_path: Path) -> tuple[Path, Path]:
     state_path = tmp_path / "state.json"
     hosts_path = tmp_path / "hosts"
     hosts_path.write_text("")
+    return state_path, hosts_path
+
+
+def test_status_reports_blocked_site_by_default(tmp_path, capsys):
+    config_path = _write_config(tmp_path)
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     exit_code = main(
         ["status"],
@@ -38,9 +43,7 @@ def test_status_reports_blocked_site_by_default(tmp_path, capsys):
 
 def test_unlock_then_status_reports_unlocked(tmp_path, capsys):
     config_path = _write_config(tmp_path)
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     exit_code = main(
         ["unlock", "reddit", "--minutes", "5"],
@@ -57,9 +60,7 @@ def test_unlock_then_status_reports_unlocked(tmp_path, capsys):
 
 def test_unlock_refused_reports_error(tmp_path, capsys):
     config_path = _write_config(tmp_path)
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     main(
         ["unlock", "reddit", "--minutes", "20"],
@@ -83,9 +84,7 @@ def test_unlock_refused_reports_error(tmp_path, capsys):
 
 def test_unlock_unknown_site_reports_error(tmp_path, capsys):
     config_path = _write_config(tmp_path)
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     exit_code = main(
         ["unlock", "nonexistent", "--minutes", "5"],
@@ -100,9 +99,7 @@ def test_unlock_unknown_site_reports_error(tmp_path, capsys):
 
 
 def test_missing_config_file_reports_error(tmp_path, capsys):
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
     missing_config = tmp_path / "does-not-exist.yaml"
 
     exit_code = main(
@@ -120,9 +117,7 @@ def test_missing_config_file_reports_error(tmp_path, capsys):
 def test_invalid_config_yaml_reports_error(tmp_path, capsys):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("sites: [this is not: valid: yaml: at all")
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     exit_code = main(
         ["status"],
@@ -139,9 +134,7 @@ def test_invalid_config_yaml_reports_error(tmp_path, capsys):
 def test_config_missing_sites_key_reports_error(tmp_path, capsys):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("enforcement_interval_seconds: 30\n")
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     exit_code = main(
         ["status"],
@@ -164,9 +157,7 @@ sites:
     hostnames: [reddit.com]
 """
     )
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
 
     exit_code = main(
         ["status"],
@@ -182,9 +173,7 @@ sites:
 
 def test_unwritable_hosts_file_reports_error(tmp_path, capsys):
     config_path = _write_config(tmp_path)
-    state_path = tmp_path / "state.json"
-    hosts_path = tmp_path / "hosts"
-    hosts_path.write_text("")
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
     hosts_path.chmod(0o444)
 
     try:

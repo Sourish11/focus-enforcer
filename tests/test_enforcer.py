@@ -7,18 +7,21 @@ from enforcer.models import Site
 from enforcer.rules import BudgetRule, ScheduleRule
 
 
-def _make_enforcer(tmp_path):
-    site = Site(
-        name="reddit",
-        hostnames=["reddit.com"],
-        daily_budget_minutes=10,
-        rules=[BudgetRule()],
-    )
+def _make_enforcer(tmp_path, sites=None):
+    if sites is None:
+        sites = [
+            Site(
+                name="reddit",
+                hostnames=["reddit.com"],
+                daily_budget_minutes=10,
+                rules=[BudgetRule()],
+            )
+        ]
     ledger = UsageLedger(tmp_path / "state.json")
     blocker = HostsFileBlocker(tmp_path / "hosts")
     (tmp_path / "hosts").write_text("")
-    enforcer = FocusEnforcer(sites=[site], ledger=ledger, blocker=blocker)
-    return enforcer, site, ledger, blocker
+    enforcer = FocusEnforcer(sites=sites, ledger=ledger, blocker=blocker)
+    return enforcer, sites[0], ledger, blocker
 
 
 def test_sync_blocks_site_by_default(tmp_path):
@@ -35,9 +38,9 @@ def test_unlock_grants_access_and_sync_reflects_it(tmp_path):
     enforcer, site, ledger, blocker = _make_enforcer(tmp_path)
     now = datetime(2026, 7, 31, 9, 0)
 
-    granted = enforcer.unlock("reddit", 5, now)
+    result = enforcer.unlock("reddit", 5, now)
 
-    assert granted is True
+    assert result.granted is True
     content = (tmp_path / "hosts").read_text()
     assert "127.0.0.1 reddit.com" not in content
 
@@ -48,9 +51,10 @@ def test_unlock_refuses_when_budget_exhausted(tmp_path):
     ledger.spend_and_unlock("reddit", 10, now)  # spends the full daily budget
 
     later = datetime(2026, 7, 31, 9, 30)
-    granted = enforcer.unlock("reddit", 5, later)
+    result = enforcer.unlock("reddit", 5, later)
 
-    assert granted is False
+    assert result.granted is False
+    assert result.reason == "insufficient_budget"
 
 
 def test_sync_aggregates_hostnames_from_all_blocked_sites(tmp_path):
@@ -66,10 +70,7 @@ def test_sync_aggregates_hostnames_from_all_blocked_sites(tmp_path):
         daily_budget_minutes=10,
         rules=[BudgetRule()],
     )
-    ledger = UsageLedger(tmp_path / "state.json")
-    blocker = HostsFileBlocker(tmp_path / "hosts")
-    (tmp_path / "hosts").write_text("")
-    enforcer = FocusEnforcer(sites=[reddit, twitter], ledger=ledger, blocker=blocker)
+    enforcer, _, ledger, blocker = _make_enforcer(tmp_path, sites=[reddit, twitter])
     now = datetime(2026, 7, 31, 9, 0)
 
     # Unlock only twitter; reddit stays blocked.
@@ -103,15 +104,13 @@ def test_unlock_fails_when_schedule_rule_still_blocks_site(tmp_path):
         daily_budget_minutes=10,
         rules=[BudgetRule(), ScheduleRule(start=time(9, 0), end=time(17, 0))],
     )
-    ledger = UsageLedger(tmp_path / "state.json")
-    blocker = HostsFileBlocker(tmp_path / "hosts")
-    (tmp_path / "hosts").write_text("")
-    enforcer = FocusEnforcer(sites=[site], ledger=ledger, blocker=blocker)
+    enforcer, _, ledger, blocker = _make_enforcer(tmp_path, sites=[site])
     now = datetime(2026, 7, 31, 10, 0)  # within the scheduled block window
 
-    granted = enforcer.unlock("reddit", 5, now)
+    result = enforcer.unlock("reddit", 5, now)
 
-    assert granted is False
+    assert result.granted is False
+    assert result.reason == "still_blocked"
     content = (tmp_path / "hosts").read_text()
     assert "127.0.0.1 reddit.com" in content
 
@@ -120,8 +119,8 @@ def test_sync_reblocks_site_after_unlock_window_expires(tmp_path):
     enforcer, site, ledger, blocker = _make_enforcer(tmp_path)
     start = datetime(2026, 7, 31, 9, 0)
 
-    granted = enforcer.unlock("reddit", 5, start)
-    assert granted is True
+    result = enforcer.unlock("reddit", 5, start)
+    assert result.granted is True
     content = (tmp_path / "hosts").read_text()
     assert "127.0.0.1 reddit.com" not in content
 

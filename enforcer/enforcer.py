@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from datetime import datetime
 
 from enforcer.hosts_blocker import HostsFileBlocker
 from enforcer.ledger import UsageLedger
 from enforcer.models import Site
+
+
+@dataclass(frozen=True)
+class UnlockResult:
+    granted: bool
+    reason: str  # "granted", "insufficient_budget", or "still_blocked"
 
 
 class FocusEnforcer:
@@ -21,22 +28,21 @@ class FocusEnforcer:
                 blocked_hostnames.extend(site.hostnames)
         self.blocker.set_blocked_hostnames(blocked_hostnames)
 
-    def unlock(self, site_name: str, minutes: float, now: datetime) -> bool:
+    def unlock(self, site_name: str, minutes: float, now: datetime) -> UnlockResult:
         site = self._find_site(site_name)
         if site is None:
             raise ValueError(f"Unknown site: {site_name}")
 
-        if minutes <= 0:
-            return False
-
         used = self.ledger.minutes_used_today(site.name, now)
         remaining = site.daily_budget_minutes - used
-        if minutes > remaining:
-            return False
+        if minutes <= 0 or minutes > remaining:
+            return UnlockResult(granted=False, reason="insufficient_budget")
 
         self.ledger.spend_and_unlock(site.name, minutes, now)
         self.sync(now)
-        return site.is_blocked(now, self.ledger) is False
+        if site.is_blocked(now, self.ledger):
+            return UnlockResult(granted=False, reason="still_blocked")
+        return UnlockResult(granted=True, reason="granted")
 
     def daemon(self, interval_seconds: int) -> None:
         while True:

@@ -18,7 +18,9 @@ class HostsFileBlocker:
             + [f"127.0.0.1 {hostname}" for hostname in hostnames]
             + [self.MANAGED_END]
         )
-        self._write_lines(before + managed + after)
+        new_lines = before + managed + after
+        if new_lines != lines:
+            self._write_lines(new_lines)
 
     def _read_lines(self) -> list[str]:
         if not self.hosts_path.exists():
@@ -32,21 +34,12 @@ class HostsFileBlocker:
         has_start = self.MANAGED_START in lines
         has_end = self.MANAGED_END in lines
 
-        # Both markers present: normal case
-        if has_start and has_end:
-            start_idx = lines.index(self.MANAGED_START)
-            end_idx = lines.index(self.MANAGED_END)
-            return lines[:start_idx], lines[end_idx + 1 :]
-
-        # Only START present: strip only the START marker itself, preserve content before and after
-        if has_start and not has_end:
-            start_idx = lines.index(self.MANAGED_START)
-            return lines[:start_idx], lines[start_idx + 1 :]
-
-        # Only END present: strip only the orphaned END marker itself, preserve content before and after
-        if has_end and not has_start:
-            end_idx = lines.index(self.MANAGED_END)
-            return lines[:end_idx], lines[end_idx + 1 :]
-
         # Neither marker present: no managed block to remove
-        return lines, []
+        if not has_start and not has_end:
+            return lines, []
+
+        # Whichever marker is missing (orphaned start/end), fall back to the
+        # marker that is present so only that single marker line is stripped.
+        before_idx = lines.index(self.MANAGED_START) if has_start else lines.index(self.MANAGED_END)
+        after_idx = lines.index(self.MANAGED_END) if has_end else lines.index(self.MANAGED_START)
+        return lines[:before_idx], lines[after_idx + 1 :]
