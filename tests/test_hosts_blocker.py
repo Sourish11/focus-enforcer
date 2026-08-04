@@ -11,8 +11,11 @@ def test_adds_managed_block_to_empty_file(tmp_path):
     content = hosts_path.read_text()
     assert "# FOCUS-ENFORCER-START" in content
     assert "127.0.0.1 reddit.com" in content
+    assert "::1 reddit.com" in content
     assert "127.0.0.1 old.reddit.com" in content
+    assert "::1 old.reddit.com" in content
     assert "# FOCUS-ENFORCER-END" in content
+    assert blocker.managed_hostnames() == {"reddit.com", "old.reddit.com"}
 
 
 def test_preserves_existing_unrelated_lines(tmp_path):
@@ -26,6 +29,7 @@ def test_preserves_existing_unrelated_lines(tmp_path):
     assert "127.0.0.1 localhost" in content
     assert "::1 localhost" in content
     assert "127.0.0.1 reddit.com" in content
+    assert "::1 reddit.com" in content
 
 
 def test_second_call_replaces_managed_block_without_duplicating(tmp_path):
