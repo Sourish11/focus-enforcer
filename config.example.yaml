@@ -1,9 +1,20 @@
 sites:
   - name: reddit
-    hostnames: [reddit.com, www.reddit.com, old.reddit.com]
+    hostnames:
+      - reddit.com
+      - www.reddit.com
+      - old.reddit.com
+      - oauth.reddit.com
+      - gateway.reddit.com
     daily_budget_minutes: 20
   - name: youtube
-    hostnames: [youtube.com, www.youtube.com]
+    hostnames:
+      - youtube.com
+      - www.youtube.com
+      - m.youtube.com
+      - youtu.be
+      - youtubei.googleapis.com
+      - www.youtube-nocookie.com
     daily_budget_minutes: 30
     scheduled_block:
       start: "09:00"
