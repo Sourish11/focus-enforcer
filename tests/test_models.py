@@ -33,3 +33,25 @@ def test_site_unblocked_if_no_rule_blocks():
 def test_site_unblocked_with_no_rules():
     site = Site(name="reddit", hostnames=["reddit.com"], daily_budget_minutes=20)
     assert site.is_blocked(datetime(2026, 7, 31, 10, 0), ledger=None) is False
+
+
+def test_site_permanent_allow_bypasses_rules():
+    site = Site(
+        name="reddit",
+        hostnames=["reddit.com"],
+        daily_budget_minutes=20,
+        rules=[_FakeRule(True)],
+        override="allow",
+    )
+    assert site.is_blocked(datetime(2026, 7, 31, 10, 0), ledger=None) is False
+
+
+def test_site_permanent_block_ignores_rules():
+    site = Site(
+        name="reddit",
+        hostnames=["reddit.com"],
+        daily_budget_minutes=20,
+        rules=[_FakeRule(False)],
+        override="block",
+    )
+    assert site.is_blocked(datetime(2026, 7, 31, 10, 0), ledger=None) is True
