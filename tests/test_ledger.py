@@ -61,3 +61,14 @@ def test_spend_and_unlock_creates_missing_state_directory(tmp_path):
 
     assert state_path.exists()
     assert ledger.minutes_used_today("reddit", now) == 10.0
+
+
+def test_clear_unlock_removes_active_window(tmp_path):
+    ledger = UsageLedger(tmp_path / "state.json")
+    now = datetime(2026, 7, 31, 9, 0)
+    ledger.spend_and_unlock("reddit", 10, now)
+    assert ledger.is_currently_unlocked("reddit", now) is True
+
+    ledger.clear_unlock("reddit")
+    assert ledger.is_currently_unlocked("reddit", now) is False
+    assert ledger.minutes_used_today("reddit", now) == 10.0

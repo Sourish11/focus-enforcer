@@ -39,3 +39,7 @@ class UsageLedger:
         until = now + timedelta(minutes=minutes)
         self._state["unlocked_until"][site_name] = until.isoformat()
         self._save()
+
+    def clear_unlock(self, site_name: str) -> None:
+        self._state["unlocked_until"].pop(site_name, None)
+        self._save()
