@@ -129,3 +129,15 @@ def test_sync_reblocks_site_after_unlock_window_expires(tmp_path):
 
     content = (tmp_path / "hosts").read_text()
     assert "127.0.0.1 reddit.com" in content
+
+
+def test_lock_clears_unlock_and_reblocks(tmp_path):
+    enforcer, site, ledger, blocker = _make_enforcer(tmp_path)
+    now = datetime(2026, 7, 31, 9, 0)
+    enforcer.unlock("reddit", 5, now)
+    assert "127.0.0.1 reddit.com" not in (tmp_path / "hosts").read_text()
+
+    enforcer.lock("reddit", now)
+
+    assert ledger.is_currently_unlocked("reddit", now) is False
+    assert "127.0.0.1 reddit.com" in (tmp_path / "hosts").read_text()
