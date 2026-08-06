@@ -18,46 +18,46 @@ ROOT = Path(__file__).resolve().parent.parent
 ENFORCER = ROOT / "venv" / "bin" / "enforcer"
 
 MENU = r"""
-+========================================================================+
-|                                                                        |
-|                            .-=[!@$#@$%]=-.                             |
-|                           //             \\                            |
-|                          ||   .-------.   ||                           |
-|                          ||  /  .---.  \  ||                           |
-|                          || |  (  *  )  | ||                           |
-|                          ||  \  '---'  /  ||                           |
-|                          ||   '-------'   ||                           |
-|                           \\             //                            |
-|                            '-=[@!$%#@$]=-'                             |
-|                                                                        |
-|                 ---->>>  F O C U S F O R C E  <<<----                  |
-|                                                                        |
-+========================================================================+
-|  HOW TO USE                                                            |
-|    Type a number and press Enter.                                      |
-|    Sites are blocked by default. Use budget spends daily minutes.      |
-|    Schedule = hard block during hours (even if budget remains).        |
-|    Block / Unblock = permanent overrides. Reset = back to normal.      |
-|    Enforcement uses /etc/hosts AND a firewall IP drop (no DoH needed). |
-|    Run `sudo -v` once first if commands ask for a password.            |
-+========================================================================+
-|                                                                        |
-|    --- daily ---                                                       |
-|    1)  Status           table of state, budget, schedule, hosts        |
-|    2)  Use budget       temporary allow (spends budget minutes)        |
-|                                                                        |
-|    --- manage sites ---                                                |
-|    3)  Add site         start managing a new website                   |
-|    4)  Remove site      stop managing a website                        |
-|    5)  Set budget       change daily minutes for a site                |
-|    6)  Set schedule     hard-block window (or clear it)                |
-|    7)  Block site       permanently block (no budget unlock)           |
-|    8)  Unblock site     permanently allow (bypass budget/schedule)     |
-|    9)  Reset site       clear permanent override; normal rules         |
-|                                                                        |
-|    q)  Quit                                                            |
-|                                                                        |
-+========================================================================+
+            +========================================================================+
+            |                                                                        |
+            |                            .-=[!@$#@$%]=-.                             |
+            |                           //             \\                            |
+            |                          ||   .-------.   ||                           |
+            |                          ||  /  .---.  \  ||                           |
+            |                          || |  (  *  )  | ||                           |
+            |                          ||  \  '---'  /  ||                           |
+            |                          ||   '-------'   ||                           |
+            |                           \\             //                            |
+            |                            '-=[@!$%#@$]=-'                             |
+            |                                                                        |
+            |                 ---->>>  F O C U S F O R C E  <<<----                  |
+            |                                                                        |
+            +========================================================================+
+            |  HOW TO USE                                                            |
+            |    Type a number and press Enter.                                      |
+            |    Sites are blocked by default. Use budget spends daily minutes.      |
+            |    Schedule = hard block during hours (even if budget remains).        |
+            |    Block / Unblock = permanent overrides. Reset = back to normal.      |
+            |    Enforcement uses /etc/hosts AND a firewall IP drop (no DoH needed). |
+            |    Run `sudo -v` once first if commands ask for a password.            |
+            +========================================================================+
+            |                                                                        |
+            |    --- daily ---                                                       |
+            |    1)  Status           table of state, budget, schedule, hosts        |
+            |    2)  Use budget       temporary allow (spends budget minutes)        |
+            |                                                                        |
+            |    --- manage sites ---                                                |
+            |    3)  Add site         start managing a new website                   |
+            |    4)  Remove site      stop managing a website                        |
+            |    5)  Set budget       change daily minutes for a site                |
+            |    6)  Set schedule     hard-block window (or clear it)                |
+            |    7)  Block site       permanently block (no budget unlock)           |
+            |    8)  Unblock site     permanently allow (bypass budget/schedule)     |
+            |    9)  Reset site       clear permanent override; normal rules         |
+            |                                                                        |
+            |    q)  Quit                                                            |
+            |                                                                        |
+            +========================================================================+
 """
 
 
