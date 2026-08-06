@@ -1,4 +1,8 @@
-# Focus Enforcer
+# FocusForce
+
+Formerly **Focus Enforcer**. Official product name is now **FocusForce**.
+The Python package, CLI entry point (`enforcer`), and config paths still use
+`focus-enforcer` / `FocusEnforcer` as technical identifiers.
 
 A website-blocking tool for Linux that enforces a daily time budget per
 site (via `/etc/hosts`), plus optional fixed-hours blocking — e.g. block
