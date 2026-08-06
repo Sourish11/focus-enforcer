@@ -16,35 +16,108 @@ Inspired by the daily-allowance idea in a separate personal project,
 Instagram Reels/Explore blocker). This is a separate from-scratch
 implementation for desktop Linux websites; no code is shared.
 
-## Setup
+## Ideas in one minute
+
+- **Configured sites are blocked by default** (written into `/etc/hosts`).
+- **Budget** = how many minutes you may unlock that site today.
+- **Unlock** = spend some of today's budget to allow access for N minutes.
+- **Schedule** = hard block during a time window (wins even if budget remains).
+- **Block** = permanently blocked (budget unlock will not work).
+- **Unblock** = permanently allowed (bypass budget and schedule).
+- **Reset** = clear permanent block/unblock; normal rules apply again.
+- Changes that affect blocking **sync `/etc/hosts` automatically**
+  (you'll see `Synced hosts automatically.`).
+
+**Note:** Sync writes ``/etc/hosts`` and also installs an ``nftables`` rule that
+drops outbound traffic to the site's resolved IPs. That means blocking still
+works when a browser uses DNS-over-HTTPS and ignores ``/etc/hosts``.
+
+## Setup (once)
 
 ```bash
+cd ~/projects/focus-enforcer
 python -m venv venv
-source venv/bin/activate
+
+# activate the venv
+source venv/bin/activate          # bash / zsh
+# source venv/bin/activate.fish   # fish
+
 pip install -e ".[dev]"
 mkdir -p ~/.config/focus-enforcer
 cp config.example.yaml ~/.config/focus-enforcer/config.yaml
-# edit ~/.config/focus-enforcer/config.yaml to list your own sites
 ```
 
-Editing `/etc/hosts` requires root, so `unlock` and `daemon` must run
-with `sudo`. Two things to watch out for:
+You can edit that YAML by hand, or manage sites entirely from the
+terminal (recommended).
 
-- `enforcer` only exists inside the venv (`venv/bin/enforcer`), and
-  `sudo` resets `PATH`, so `sudo enforcer ...` fails with "command not
-  found." Use the full path under `venv/bin/`.
-- `sudo` also resets `HOME` (usually to `/root`), and this tool's
-  default config/state paths use `Path.home()`. Without `-E`, sudo
-  commands would use `/root/.config/focus-enforcer/...` instead of your
-  user's. Pass `-E` so both agree on the same paths.
+### sudo notes
+
+Commands that change `/etc/hosts` need root. Always use:
 
 ```bash
-sudo -E venv/bin/enforcer status
-sudo -E venv/bin/enforcer unlock reddit --minutes 15
-sudo -E venv/bin/enforcer daemon   # run in the foreground, or wrap in a systemd user service
+sudo -E venv/bin/enforcer ...
 ```
 
-(`status` doesn't need root — `venv/bin/enforcer status` is fine.)
+- Use the **full path** `venv/bin/enforcer` (sudo clears `PATH`).
+- Pass **`-E`** so config/state stay under your home, not `/root`.
+- Optional: run `sudo -v` once so you are not prompted mid-demo.
+
+## Easiest way: interactive menu
+
+```bash
+cd ~/projects/focus-enforcer
+sudo -v
+python scripts/demo_menu.py
+```
+
+The menu clears after each action. Type a key, follow the prompts,
+press Enter to return.
+
+| Key | What it does |
+|-----|----------------|
+| `1` | Status — table of state, budget, schedule, hosts |
+| `2` | Use budget — temporary allow (spend minutes) |
+| `3` | Add a site |
+| `4` | Remove a site |
+| `5` | Change daily budget |
+| `6` | Set or clear hard-block schedule |
+| `7` | Permanently block |
+| `8` | Permanently unblock |
+| `9` | Reset — clear permanent override; normal rules |
+| `q` | Quit |
+
+Typical first run:
+
+1. `1` — see Reddit/YouTube from the example config  
+2. `2` — use budget for Reddit (5 minutes)  
+3. `1` — confirm Reddit is unlocked  
+4. `7` — permanently block Reddit  
+5. `9` — reset Reddit to normal rules  
+
+## CLI (same features, no menu)
+
+```bash
+# Inspect (no sudo)
+venv/bin/enforcer status
+
+# Manage sites
+sudo -E venv/bin/enforcer add twitter --hostnames twitter.com,www.twitter.com --budget 15
+sudo -E venv/bin/enforcer set-budget twitter --minutes 20
+sudo -E venv/bin/enforcer set-schedule youtube --start 09:00 --end 17:00
+sudo -E venv/bin/enforcer set-schedule youtube --clear
+sudo -E venv/bin/enforcer remove twitter
+
+# Block / unlock
+sudo -E venv/bin/enforcer unlock reddit --minutes 15
+sudo -E venv/bin/enforcer block reddit
+sudo -E venv/bin/enforcer unblock youtube
+sudo -E venv/bin/enforcer reset youtube
+
+# Optional: keep re-applying when unlock windows expire
+sudo -E venv/bin/enforcer daemon
+```
+
+(`status` does not need root.)
 
 ## Running the tests
 
