@@ -40,9 +40,10 @@ def test_status_reports_blocked_site_by_default(tmp_path, capsys):
     assert "reddit" in out
     assert "blocked" in out.lower()
     assert "reddit.com" in out
-    assert "20 min" in out
-    assert "SITE" in out
-    assert "STATE" in out
+    assert "20/20 min" in out
+    assert "STATUS" in out
+    assert "budget" in out
+    assert "hosts" in out
 
 
 def test_unlock_then_status_reports_unlocked(tmp_path, capsys):
@@ -215,7 +216,28 @@ def test_add_site_shows_in_status(tmp_path, capsys):
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "twitter" in out
-    assert "15 min" in out
+    assert "15/15 min" in out
+
+
+def test_status_fits_narrow_terminal(tmp_path, capsys, monkeypatch):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(Path("config.example.yaml").read_text())
+    state_path, hosts_path = _state_and_hosts_paths(tmp_path)
+    monkeypatch.setenv("COLUMNS", "50")
+
+    exit_code = main(
+        ["status"],
+        state_path=state_path,
+        hosts_path=hosts_path,
+        config_path=config_path,
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "reddit" in out
+    assert "youtube" in out
+    assert "hosts" in out
+    for line in out.splitlines():
+        assert len(line) <= 50, f"line too wide ({len(line)}): {line!r}"
 
 
 def test_add_duplicate_site_fails(tmp_path, capsys):
@@ -262,7 +284,7 @@ def test_set_budget(tmp_path, capsys):
     assert exit_code == 0
 
     main(["status"], state_path=state_path, hosts_path=hosts_path, config_path=config_path)
-    assert "40 min" in capsys.readouterr().out
+    assert "40/40 min" in capsys.readouterr().out
 
 
 def test_set_and_clear_schedule(tmp_path, capsys):
@@ -312,7 +334,7 @@ def test_block_after_unlock(tmp_path, capsys):
     assert exit_code == 0
     main(["status"], state_path=state_path, hosts_path=hosts_path, config_path=config_path)
     out = capsys.readouterr().out.lower()
-    assert "blocked*" in out or "blocked *" in out or "blocked*" in out.replace(" ", "")
+    assert "[blocked*]" in out
     assert "127.0.0.1 reddit.com" in hosts_path.read_text()
 
     exit_code = main(

@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import os
 import pwd
+import shutil
+import textwrap
 from datetime import datetime, time
 from pathlib import Path
 
@@ -169,59 +171,155 @@ def _hosts_marker(site: Site, managed: set[str]) -> str:
     return "no"
 
 
+def _terminal_width(fallback: int = 80) -> int:
+    """Usable terminal width; works in split panes / half-screen frames."""
+    try:
+        width = shutil.get_terminal_size(fallback=(fallback, 24)).columns
+    except OSError:
+        width = fallback
+    return max(40, width)
+
+
+def _status_layout() -> tuple[str, int]:
+    """Return (indent, inner_width) so the status frame fits the pane.
+
+    Wide terminals match the FocusForce menu frame. Half-screen / split panes
+    fill the available width edge-to-edge so nothing looks clipped or sparse.
+    """
+    term = _terminal_width()
+    menu_inner = 72
+    menu_indent = 12
+    menu_outer = menu_inner + 4  # + borders
+    if term >= menu_indent + menu_outer:
+        return " " * menu_indent, menu_inner
+
+    inner = max(36, term - 4)
+    outer = inner + 4
+    spare = max(0, term - outer)
+    return " " * (spare // 2), inner
+
+
+def _box_rule(inner: int, heavy: bool = False) -> str:
+    fill = "=" if heavy else "-"
+    return "+" + fill * (inner + 2) + "+"
+
+
+def _box_row(text: str, inner: int) -> str:
+    if len(text) > inner:
+        text = text[: max(0, inner - 1)] + "~"
+    return f"| {text.ljust(inner)} |"
+
+
+
+
+def _pack_items(items: list[str], width: int) -> list[str]:
+    """Pack items into lines without splitting an item across lines."""
+    if not items:
+        return [""]
+    lines: list[str] = []
+    current = ""
+    for item in items:
+        piece = item if not current else current + ", " + item
+        if not current or len(piece) <= width:
+            current = piece
+            continue
+        lines.append(current)
+        current = item if len(item) <= width else item[: width - 1] + "~"
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _box_kv(label: str, value: str, inner: int) -> list[str]:
+    prefix = f"  {label:<9} "
+    avail = max(8, inner - len(prefix))
+    chunks = textwrap.wrap(
+        value,
+        width=avail,
+        break_long_words=True,
+        break_on_hyphens=False,
+    ) or [""]
+    lines = [_box_row(prefix + chunks[0], inner)]
+    indent = " " * len(prefix)
+    for chunk in chunks[1:]:
+        lines.append(_box_row(indent + chunk, inner))
+    return lines
+
+
+def _box_hosts(hostnames: list[str], inner: int) -> list[str]:
+    prefix = "  hosts     "
+    avail = max(8, inner - len(prefix))
+    if not hostnames:
+        return [_box_row(prefix + "(none)", inner)]
+    packed = _pack_items(hostnames, avail)
+    lines = [_box_row(prefix + packed[0], inner)]
+    indent = " " * len(prefix)
+    for chunk in packed[1:]:
+        lines.append(_box_row(indent + chunk, inner))
+    return lines
+
+
 def _cmd_status(enforcer: FocusEnforcer, now: datetime) -> int:
     if not enforcer.sites:
         print("No sites configured.")
         return 0
 
+    indent, inner = _status_layout()
     managed = enforcer.blocker.managed_hostnames()
-    headers = ("SITE", "STATE", "IN HOSTS", "BUDGET LEFT", "SCHEDULE", "HOSTS")
-    rows: list[tuple[str, str, str, str, str, str]] = []
-    for site in enforcer.sites:
+    has_override = False
+
+    def emit(line: str) -> None:
+        print(f"{indent}{line}")
+
+    emit(_box_rule(inner, heavy=True))
+    emit(_box_row("STATUS".center(inner), inner))
+    emit(_box_rule(inner, heavy=True))
+
+    for index, site in enumerate(enforcer.sites):
+        if index:
+            emit(_box_rule(inner, heavy=False))
+
         used = enforcer.ledger.minutes_used_today(site.name, now)
         remaining = max(0.0, site.daily_budget_minutes - used)
         schedule = site_schedule(site)
+
         if site.override == "allow":
             state = "unblocked*"
+            has_override = True
         elif site.override == "block":
             state = "blocked*"
+            has_override = True
         else:
             state = "blocked" if site.is_blocked(now, enforcer.ledger) else "unlocked"
+
         schedule_text = (
             f"{schedule.start.strftime('%H:%M')}-{schedule.end.strftime('%H:%M')}"
             if schedule is not None
             else "none"
         )
-        rows.append(
-            (
-                site.name,
-                state,
-                _hosts_marker(site, managed),
-                f"{remaining:.0f}/{site.daily_budget_minutes} min",
-                schedule_text,
-                ", ".join(site.hostnames),
-            )
-        )
 
-    widths = [len(h) for h in headers]
-    for row in rows:
-        for i, cell in enumerate(row):
-            widths[i] = max(widths[i], len(cell))
+        state_tag = f"[{state}]"
+        name = site.name
+        if len(name) + 1 + len(state_tag) > inner:
+            name_max = max(3, inner - 1 - len(state_tag))
+            name = name[: name_max - 1] + "~"
+        pad = max(1, inner - len(name) - len(state_tag))
+        emit(_box_row(f"{name}{' ' * pad}{state_tag}", inner))
+        for line in _box_kv("budget", f"{remaining:.0f}/{site.daily_budget_minutes} min", inner):
+            emit(line)
+        for line in _box_kv("schedule", schedule_text, inner):
+            emit(line)
+        for line in _box_kv("in hosts", _hosts_marker(site, managed), inner):
+            emit(line)
+        for line in _box_hosts(site.hostnames, inner):
+            emit(line)
 
-    def fmt(cells: tuple[str, ...] | list[str]) -> str:
-        return " | ".join(cell.ljust(widths[i]) for i, cell in enumerate(cells))
-
-    rule = "-+-".join("-" * w for w in widths)
-    print(fmt(headers))
-    print(rule)
-    for row in rows:
-        print(fmt(row))
-    if any(site.override is not None for site in enforcer.sites):
-        print()
-        print("* permanent override — use `reset` to return to normal budget/schedule rules")
-    print()
-    print("IN HOSTS = whether /etc/hosts currently redirects that site to localhost.")
-    print("Blocking also drops traffic by IP in the firewall (bypasses browser DNS tricks).")
+    emit(_box_rule(inner, heavy=True))
+    if has_override:
+        note = "* permanent override — use reset for normal rules"
+        for chunk in textwrap.wrap(note, width=inner) or [note]:
+            emit(_box_row(chunk, inner))
+        emit(_box_rule(inner, heavy=True))
     return 0
 
 
